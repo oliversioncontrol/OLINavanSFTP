@@ -1,16 +1,16 @@
 ﻿// See https://aka.ms/new-console-template for more information
+// using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration;
 using OLINavanSFTP.Data;
 using OLINavanSFTP.Handlers;
+using OLINavanSFTP.Models;
 using Renci.SshNet;
 
-bool dev = false;
-// bool dev = true;
-
-string localFileRoot = "C:\\ScheduledTasks\\NavanSFTP\\";
-if (dev)
+string EscapeDoubleQuotes(string input)
 {
-    localFileRoot = "./";
+    // return input;
+    // return input.Replace("\"", "");
+    return input.Replace("\"", "\"\"");
 }
 
 DateTime startTime = DateTime.Now;
@@ -19,8 +19,17 @@ IConfiguration config = new ConfigurationBuilder()
     .AddJsonFile("appsettings.json")
     .Build();
 
+bool devRun = config.GetSection("IsDev").Get<bool>();
+// bool dev = true;
+
+string localFileRoot = "C:\\ScheduledTasks\\NavanSFTP\\";
+if (devRun)
+{
+    localFileRoot = "./";
+}
+
 DataContextDapper dapper = new DataContextDapper(config);
-LoggingHandler logging = new LoggingHandler(dapper, dev);
+LoggingHandler logging = new LoggingHandler(dapper, devRun);
 
 logging.WriteLog((DateTime.Now - startTime).TotalSeconds.ToString());
 logging.WriteLog("Preparing SFTP Credentials");
@@ -59,9 +68,33 @@ var connection = new ConnectionInfo(sftpClientURL, port, username, authMethod);
 logging.WriteLog((DateTime.Now - startTime).TotalSeconds.ToString());
 logging.WriteLog("Getting Job Info");
 
-IEnumerable<string> jobNumbers = dapper.LoadData<string>("EXEC dbo.spJobNumbersForNavan_Get");
+IEnumerable<JobInfo> jobNumbers = dapper.LoadData<JobInfo>("EXEC dbo.spJobNumbersForNavan_Get");
+// string csvHeader = "Projects\n";
 
-string jobNumberCSV = "Projects\nField\n" + String.Join("\n", jobNumbers);
+// string jobNumberCSV = csvHeader;
+// foreach (JobInfo job in jobNumbers)
+// {
+//     jobNumberCSV += $"{EscapeDoubleQuotes(job.Project)}\n";
+// }
+
+// string csvHeader = "Name,ID,Default,Approver(s)\n";
+
+// string jobNumberCSV = csvHeader;
+// foreach (JobInfo job in jobNumbers)
+// {
+//     jobNumberCSV += $"\"{EscapeDoubleQuotes(job.Project)}\",\"{job.JobNumber}\",\"{job.IsDefault}\",\"{job.Approvers}\"\n";
+// }
+
+// // string csvHeader = "Projects,Name,ID,Default,Approver(s),Follow Up Responses\n";
+string csvHeader = "Custom Field Name,Name,ID,Default,Approver(s)\n";
+
+string jobNumberCSV = csvHeader;
+foreach (JobInfo job in jobNumbers)
+{
+    jobNumberCSV += $"\"projects\",\"{EscapeDoubleQuotes(job.Project)}\",\"{job.JobNumber}\",\"{job.IsDefault}\",\"{job.Approvers}\"\n";
+}
+
+// string jobNumberCSV = "Projects\nField\n" + String.Join("\n", jobNumbers);
 // string jobNumberCSV = "Projects\nField\n'" + String.Join("'\n'", jobNumbers) + "'";
 // string jobNumberCSV = "Projects\nField\n\"" + String.Join("\"\n\"", jobNumbers) + "\"";
 
